@@ -21,7 +21,7 @@ return function (net_conf, gk_conf, gt_conf, lls_conf, numa_table)
 	local num_attempts_kni_link_set = 5
 	local max_rt_update_pkts = 8
 	local scan_interval_sec = 5
-	local kni_kmod_path
+	local kni_kmod_path = "/home/ubuntu/gatekeeper/dependencies/dpdk/build/kmod/rte_kni.ko"
 
 	--
 	-- End configuration of CPS block.
