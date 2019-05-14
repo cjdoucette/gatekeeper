@@ -37,7 +37,7 @@ function gatekeeper_init()
 
 	if gatekeeper_server == true then
 		-- n_lcores + 2 on same NUMA: for GK-GT Unit and Solicitor.
-		local n_lcores = 2
+		local n_lcores = 1
 		local gk_lcores =
 			staticlib.alloc_lcores_from_same_numa(numa_table,
 				n_lcores + 2)
