@@ -10,7 +10,7 @@ function gatekeeper_init()
 	-- When gatekeeper_server is true,
 	-- Gatekeeper will run as a Gatekeeper server.
 	-- Otherwise, it will run as a grantor server.
-	local gatekeeper_server = true
+	local gatekeeper_server = false
 
 	-- Set the global log level to one of
 	-- RTE_LOG_{EMERG,ALERT,CRIT,ERR,WARNING,NOTICE,INFO,DEBUG}.

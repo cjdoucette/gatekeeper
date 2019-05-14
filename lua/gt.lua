@@ -5,7 +5,7 @@ return function (net_conf, lls_conf, numa_table)
 	--
 
 	-- These parameters should likely be initially changed.
-	local n_lcores = 2
+	local n_lcores = 1
 	local log_level = staticlib.c.RTE_LOG_DEBUG
 	local lua_policy_file = "examples/policy.lua"
 	local lua_base_directory = "./lua"

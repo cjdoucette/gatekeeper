@@ -9,15 +9,16 @@ return function (gatekeeper_server)
 	local log_level = staticlib.c.RTE_LOG_DEBUG
 	local user --= "gatekeeper"
 
-	local front_ports = {"enp133s0f0"}
-	local front_ips  = {"10.0.1.1/24", "2001:db8:1::1/48"}
+	local front_ports = {"ens6"}
+	local front_ips  = {"172.31.3.117/24", "2600:1f16:354:f703:795:5efd:5335:f95c/64"}
 	local front_bonding_mode = staticlib.c.BONDING_MODE_ROUND_ROBIN
 	local front_vlan_tag = 0x123
-	local front_vlan_insert = true
-	local front_mtu = 1500
+	local front_vlan_insert = false
+	local front_mtu = 2500
 
-	local back_ports = {"enp133s0f1"}
-	local back_ips  = {"10.0.2.1/24", "2001:db8:2::1/48"}
+	-- Not used.
+	local back_ports = {"ens7"}
+	local back_ips  = {"172.31.3.102/24", "2600:1f16:354:f703:45a9:a858:e300:1501/64"}
 	local back_bonding_mode = staticlib.c.BONDING_MODE_ROUND_ROBIN
 	local back_vlan_tag = 0x456
 	local back_vlan_insert = true
@@ -41,7 +42,7 @@ return function (gatekeeper_server)
 	local back_ipv6_default_hop_limits = 255
 	local rotate_log_interval_sec = 60 * 60  -- (1 hour)
 	local front_ipv4_hw_udp_cksum = true
-	local front_ipv6_hw_udp_cksum = true
+	local front_ipv6_hw_udp_cksum = false
 	local back_ipv4_hw_udp_cksum = true
 	local back_ipv6_hw_udp_cksum = true
 	local front_ipv4_hw_cksum = true

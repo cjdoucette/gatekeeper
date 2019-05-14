@@ -609,6 +609,21 @@ decap_and_fill_eth(struct rte_mbuf *m, struct gt_config *gt_conf,
 			set_ipv4_checksum(iface, m, inner_ipv4_hdr);
 		}
 
+		/*
+		 * For Amazon testbed, always re-compute checksum
+		 * because we changed the packet at Gatekeeper.
+		 */
+		if (true) {
+			inner_ipv4_hdr->hdr_checksum = 0;
+			m->l3_len = ipv4_hdr_len(inner_ipv4_hdr);
+			m->ol_flags |= PKT_TX_IPV4;
+			if (likely(gt_conf->net->front.ipv4_hw_cksum)) {
+				m->ol_flags |= PKT_TX_IP_CKSUM;
+			} else {
+				inner_ipv4_hdr->hdr_checksum =
+					rte_ipv4_cksum(inner_ipv4_hdr);
+			}
+		}
 		neigh = &instance->neigh;
 		ip_dst = &inner_ipv4_hdr->dst_addr;
 
