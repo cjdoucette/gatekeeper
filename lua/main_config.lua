@@ -43,7 +43,7 @@ function gatekeeper_init()
 		-- The following expression to set the number of
 		-- GK block instances is a good recommendation,
 		-- but it may not be optimal for all cases.
-		local n_gk_lcores = 2 * staticlib.count_numa_nodes(numa_table)
+		local n_gk_lcores = 1
 		if n_gk_lcores <= 0 then
 			error("No GK block allocated for Gatekeeper server")
 		end

@@ -17,7 +17,7 @@ return function (net_conf, sol_lcores)
 
 	-- These variables are unlikely to need to be changed.
 	local tb_rate_approx_err = 1e-7
-	local req_channel_bw_mbps = 0.0
+	local req_channel_bw_mbps = 1000 -- 1 Gbps.
 
 	--
 	-- End configuration of SOL block.
