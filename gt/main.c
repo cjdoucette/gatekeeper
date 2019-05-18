@@ -779,8 +779,7 @@ fill_notify_pkt_hdr(struct rte_mbuf *notify_pkt,
 		rte_memcpy(notify_ipv6->dst_addr, ipv6_hdr->src_addr,
 			sizeof(notify_ipv6->dst_addr));
 
-		notify_pkt->ol_flags |= (PKT_TX_IPV6 |
-			PKT_TX_IP_CKSUM | PKT_TX_UDP_CKSUM);
+		notify_pkt->ol_flags |= (PKT_TX_IPV6 | PKT_TX_UDP_CKSUM);
 		notify_pkt->l3_len = sizeof(struct ipv6_hdr);
 	}
 

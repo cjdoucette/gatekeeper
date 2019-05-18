@@ -839,6 +839,36 @@ check_port_mtu(struct gatekeeper_if *iface, unsigned int port_idx,
 }
 
 static int
+check_port_cksum(struct gatekeeper_if *iface, unsigned int port_idx,
+	const struct rte_eth_dev_info *dev_info,
+	struct rte_eth_conf *port_conf)
+{
+	if (ipv4_if_configured(iface) &&
+			(port_conf->txmode.offloads &
+			 DEV_TX_OFFLOAD_IPV4_CKSUM) &&
+			!(dev_info->tx_offload_capa &
+			DEV_TX_OFFLOAD_IPV4_CKSUM)) {
+		G_LOG(NOTICE, "net: port %hu (%s) on the %s interface doesn't support offloading IPv4 checksumming\n",
+			iface->ports[port_idx], iface->pci_addrs[port_idx],
+			iface->name);
+		port_conf->txmode.offloads &= ~DEV_TX_OFFLOAD_IPV4_CKSUM;
+		return -1;
+	}
+
+	if ((port_conf->txmode.offloads & DEV_TX_OFFLOAD_UDP_CKSUM) &&
+			!(dev_info->tx_offload_capa &
+			DEV_TX_OFFLOAD_UDP_CKSUM)) {
+		G_LOG(NOTICE, "net: port %hu (%s) on the %s interface doesn't support offloading UDP checksumming\n",
+			iface->ports[port_idx], iface->pci_addrs[port_idx],
+			iface->name);
+		port_conf->txmode.offloads &= ~DEV_TX_OFFLOAD_UDP_CKSUM;
+		return -1;
+	}
+
+	return 0;
+}
+
+static int
 check_port_offloads(struct gatekeeper_if *iface,
 	struct rte_eth_conf *port_conf)
 {
@@ -862,11 +892,13 @@ check_port_offloads(struct gatekeeper_if *iface,
 	if (ipv4_if_configured(iface)) {
 		port_conf->rx_adv_conf.rss_conf.rss_hf |=
 			GATEKEEPER_IPV4_RSS_HF;
+		port_conf->txmode.offloads |= DEV_TX_OFFLOAD_IPV4_CKSUM;
 	}
 	if (ipv6_if_configured(iface)) {
 		port_conf->rx_adv_conf.rss_conf.rss_hf |=
 			GATEKEEPER_IPV6_RSS_HF;
 	}
+	port_conf->txmode.offloads |= DEV_TX_OFFLOAD_UDP_CKSUM;
 
 	/*
 	 * Set up device MTU.
@@ -899,6 +931,11 @@ check_port_offloads(struct gatekeeper_if *iface,
 
 		/* Check for MTU capability and offloads. */
 		ret = check_port_mtu(iface, i, &dev_info, port_conf);
+		if (ret < 0)
+			return ret;
+
+		/* Check for checksum capability and offloads. */
+		ret = check_port_cksum(iface, i, &dev_info, port_conf);
 		if (ret < 0)
 			return ret;
 	}
