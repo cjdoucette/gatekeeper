@@ -114,14 +114,17 @@ look_up_fib(struct gk_lpm *ltbl, struct ip_flow *flow)
 }
 
 static int
-extract_packet_info(struct rte_mbuf *pkt, struct ipacket *packet)
+extract_packet_info(struct rte_mbuf *pkt, struct ipacket *packet,
+	struct gatekeeper_if *other_side)
 {
 	int ret = 0;
 	uint16_t ether_type;
 	size_t ether_len;
 	struct rte_ether_hdr *eth_hdr;
-	struct rte_ipv4_hdr *ip4_hdr;
-	struct rte_ipv6_hdr *ip6_hdr;
+	struct rte_ipv4_hdr *ip4_hdr = NULL;
+	struct rte_ipv6_hdr *ip6_hdr = NULL;
+	struct rte_tcp_hdr *tcp_hdr = NULL;
+	struct rte_udp_hdr *udp_hdr = NULL;
 	uint16_t pkt_len = rte_pktmbuf_data_len(pkt);
 
 	eth_hdr = rte_pktmbuf_mtod(pkt, struct rte_ether_hdr *);
@@ -130,7 +133,7 @@ extract_packet_info(struct rte_mbuf *pkt, struct ipacket *packet)
 	ether_len = pkt_in_l2_hdr_len(pkt);
 
 	switch (ether_type) {
-	case RTE_ETHER_TYPE_IPV4:
+	case RTE_ETHER_TYPE_IPV4: {
 		if (pkt_len < ether_len + sizeof(*ip4_hdr)) {
 			packet->flow.proto = 0;
 			GK_LOG(NOTICE,
@@ -144,9 +147,14 @@ extract_packet_info(struct rte_mbuf *pkt, struct ipacket *packet)
 		packet->flow.proto = RTE_ETHER_TYPE_IPV4;
 		packet->flow.f.v4.src.s_addr = ip4_hdr->src_addr;
 		packet->flow.f.v4.dst.s_addr = ip4_hdr->dst_addr;
+		if (ip4_hdr->next_proto_id == IPPROTO_TCP)
+			tcp_hdr = (struct rte_tcp_hdr *)&ip4_hdr[1];
+		else if (ip4_hdr->next_proto_id == IPPROTO_UDP)
+			udp_hdr = (struct rte_udp_hdr *)&ip4_hdr[1];
 		break;
+	}
 
-	case RTE_ETHER_TYPE_IPV6:
+	case RTE_ETHER_TYPE_IPV6: {
 		if (pkt_len < ether_len + sizeof(*ip6_hdr)) {
 			packet->flow.proto = 0;
 			GK_LOG(NOTICE,
@@ -156,13 +164,19 @@ extract_packet_info(struct rte_mbuf *pkt, struct ipacket *packet)
 			goto out;
 		}
 
+		/* Won't work for variable-length IPv6 header. */
 		ip6_hdr = packet->l3_hdr;
 		packet->flow.proto = RTE_ETHER_TYPE_IPV6;
 		rte_memcpy(packet->flow.f.v6.src.s6_addr, ip6_hdr->src_addr,
 			sizeof(packet->flow.f.v6.src.s6_addr));
 		rte_memcpy(packet->flow.f.v6.dst.s6_addr, ip6_hdr->dst_addr,
 			sizeof(packet->flow.f.v6.dst.s6_addr));
+		if (ip6_hdr->proto == IPPROTO_TCP)
+			tcp_hdr = (struct rte_tcp_hdr *)&ip6_hdr[1];
+		else if (ip6_hdr->proto == IPPROTO_UDP)
+			udp_hdr = (struct rte_udp_hdr *)&ip6_hdr[1];
 		break;
+	}
 
 	case RTE_ETHER_TYPE_ARP:
 		packet->flow.proto = RTE_ETHER_TYPE_ARP;
@@ -175,6 +189,39 @@ extract_packet_info(struct rte_mbuf *pkt, struct ipacket *packet)
 		ret = -1;
 		break;
 	}
+
+	if (strcmp(other_side->name, "front") == 0) {
+		/* Route according to 172.31.5.0/24 rule. */
+		if (ip4_hdr != NULL) {
+			uint32_t src_addr = ntohl(ip4_hdr->src_addr);
+			uint32_t new_dst_addr;
+
+			if (src_addr != 0xAC1F0076)
+				goto out;
+
+			/* Calculate destination address using source port. */
+			new_dst_addr = ntohl(ip4_hdr->dst_addr);
+			new_dst_addr &= 0xFFFF0000;
+			/* Assume destination is in 172.31.5.0/24. */
+			new_dst_addr |= 0x000005B8;
+			ip4_hdr->dst_addr = htonl(new_dst_addr);
+
+			/* Update flow data structure. */
+			packet->flow.f.v4.dst.s_addr = ip4_hdr->dst_addr;
+
+			/* Recompute checksums. */
+			ip4_hdr->hdr_checksum = 0;
+			if (tcp_hdr != NULL) {
+				tcp_hdr->cksum = 0;
+				tcp_hdr->cksum = rte_ipv4_udptcp_cksum(ip4_hdr, tcp_hdr);
+			} else if (udp_hdr != NULL) {
+				udp_hdr->dgram_cksum = 0;
+				udp_hdr->dgram_cksum = rte_ipv4_udptcp_cksum(ip4_hdr, udp_hdr);
+			}
+			ip4_hdr->hdr_checksum = rte_ipv4_cksum(ip4_hdr);
+		}
+	}
+
 out:
 	packet->pkt = pkt;
 	return ret;
@@ -1518,14 +1565,14 @@ parse_packet(struct ipacket *packet, struct rte_mbuf *pkt,
 	bool ipv4_configured_front, bool ipv6_configured_front,
 	struct ip_flow **flow_arr, uint32_t *flow_hash_val_arr,
 	int *num_ip_flows, struct gatekeeper_if *front,
-	struct gk_instance *instance)
+	struct gatekeeper_if *back, struct gk_instance *instance)
 {
 	int ret;
 	struct gk_measurement_metrics *stats = &instance->traffic_stats;
 
 	stats->tot_pkts_size += rte_pktmbuf_pkt_len(pkt);
 
-	ret = extract_packet_info(pkt, packet);
+	ret = extract_packet_info(pkt, packet, back);
 	if (ret < 0) {
 		if (likely(packet->flow.proto == RTE_ETHER_TYPE_ARP)) {
 			stats->tot_pkts_num_distributed++;
@@ -1624,7 +1671,7 @@ process_pkts_front(uint16_t port_front, uint16_t rx_queue_front,
 
 		parse_packet(&pkt_arr[num_ip_flows], rx_bufs[i], arp_bufs,
 			&num_arp, ipv4_configured_front, ipv6_configured_front,
-			flow_arr, flow_hash_val_arr, &num_ip_flows, front,
+			flow_arr, flow_hash_val_arr, &num_ip_flows, front, back,
 			instance);
 	}
 
@@ -1632,7 +1679,7 @@ process_pkts_front(uint16_t port_front, uint16_t rx_queue_front,
 	for (; i < num_rx; i++) {
 		parse_packet(&pkt_arr[num_ip_flows], rx_bufs[i], arp_bufs,
 			&num_arp, ipv4_configured_front, ipv6_configured_front,
-			flow_arr, flow_hash_val_arr, &num_ip_flows, front,
+			flow_arr, flow_hash_val_arr, &num_ip_flows, front, back,
 			instance);
 	}
 
@@ -1787,6 +1834,42 @@ process_fib(struct ipacket *packet, struct gk_fib *fib,
 		eth_cache = fib->u.gateway.eth_cache;
 		RTE_VERIFY(eth_cache != NULL);
 
+		if (packet->flow.proto == RTE_ETHER_TYPE_IPV4) {
+			struct rte_ipv4_hdr *ip4_hdr = packet->l3_hdr;
+			ip4_hdr = rte_pktmbuf_mtod_offset(pkt,
+				struct rte_ipv4_hdr *,
+				sizeof(struct rte_ether_hdr));
+			struct rte_tcp_hdr *tcp_hdr = NULL;
+			struct rte_udp_hdr *udp_hdr = NULL;
+			uint32_t new_dst_addr;
+
+			new_dst_addr = ntohl(ip4_hdr->dst_addr);
+			new_dst_addr &= 0xFFFF00FF;
+			new_dst_addr |= 0x00000100;
+			ip4_hdr->dst_addr = htonl(new_dst_addr);
+
+			/* Update flow data structure. */
+			packet->flow.f.v4.dst.s_addr = ip4_hdr->dst_addr;
+
+			if (ip4_hdr->next_proto_id == IPPROTO_TCP)
+				tcp_hdr = (struct rte_tcp_hdr *)&ip4_hdr[1];
+			else if (ip4_hdr->next_proto_id == IPPROTO_UDP)
+				udp_hdr = (struct rte_udp_hdr *)&ip4_hdr[1];
+			else
+				goto adjust;
+
+			/* Recompute checksums. */
+			ip4_hdr->hdr_checksum = 0;
+			if (tcp_hdr != NULL) {
+				tcp_hdr->cksum = 0;
+				tcp_hdr->cksum = rte_ipv4_udptcp_cksum(ip4_hdr, tcp_hdr);
+			} else if (udp_hdr != NULL) {
+				udp_hdr->dgram_cksum = 0;
+				udp_hdr->dgram_cksum = rte_ipv4_udptcp_cksum(ip4_hdr, udp_hdr);
+			}
+			ip4_hdr->hdr_checksum = rte_ipv4_cksum(ip4_hdr);
+		}
+adjust:
 		if (adjust_pkt_len(pkt, front, 0) == NULL ||
 				pkt_copy_cached_eth_header(pkt,
 					eth_cache,
@@ -1909,7 +1992,7 @@ process_pkts_back(uint16_t port_back, uint16_t rx_queue_back,
 		struct ipacket *packet = &pkt_arr[num_ip_flows];
 		struct rte_mbuf *pkt = rx_bufs[i];
 
-		ret = extract_packet_info(pkt, packet);
+		ret = extract_packet_info(pkt, packet, &gk_conf->net->front);
 		if (ret < 0) {
 			if (likely(packet->flow.proto == RTE_ETHER_TYPE_ARP)) {
 				arp_bufs[num_arp++] = pkt;
