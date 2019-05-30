@@ -259,6 +259,7 @@ main(int argc, char *argv[])
 		fprintf(stderr, "Failed to receive message\n");
 		ret = -1;
 	}
+	printf("%s\n", recv_buff);
 
 close_sock:
 	close(sock_fd);
