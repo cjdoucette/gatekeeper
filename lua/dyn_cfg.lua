@@ -12,7 +12,7 @@ return function (net_conf, gk_conf, gt_conf, numa_table)
 	local log_ratelimit_burst = 10
 
 	-- These variables are unlikely to need to be changed.
-	local server_path = "/var/run/gatekeeper/dyn_cfg.socket"
+	local server_path = "/var/run/gatekeeper/dyn_cfg_2.socket"
 	local lua_dy_base_dir = "./lua"
 	local lua_dy_lib = "gatekeeper/dylib.lua"
 	local rcv_timeout_sec = 30

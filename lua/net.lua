@@ -9,13 +9,14 @@ return function (gatekeeper_server)
 	local log_level = staticlib.c.RTE_LOG_DEBUG
 	local user --= "gatekeeper"
 
-	local front_ports = {"enp133s0f0"}
-	local front_ips  = {"10.0.1.1/24", "2001:db8:1::1/48"}
+	local front_ports = {"enp131s0f1"}
+	local front_ips  = {"10.0.3.2/24", "2001:db8:3::2/48"}
 	local front_bonding_mode = staticlib.c.BONDING_MODE_ROUND_ROBIN
 	local front_vlan_tag = 0x123
 	local front_vlan_insert = false
 	local front_mtu = 1500
 
+	-- Not used.
 	local back_ports = {"enp133s0f1"}
 	local back_ips  = {"10.0.2.1/24", "2001:db8:2::1/48"}
 	local back_bonding_mode = staticlib.c.BONDING_MODE_ROUND_ROBIN

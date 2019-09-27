@@ -10,7 +10,7 @@ function gatekeeper_init()
 	-- When gatekeeper_server is true,
 	-- Gatekeeper will run as a Gatekeeper server.
 	-- Otherwise, it will run as a grantor server.
-	local gatekeeper_server = true
+	local gatekeeper_server = false
 
 	-- Set the global log level to one of
 	-- RTE_LOG_{EMERG,ALERT,CRIT,ERR,WARNING,NOTICE,INFO,DEBUG}.
@@ -59,8 +59,8 @@ function gatekeeper_init()
 
 	-- Allocate CPS after to increase the change that the LLS block is
 	-- allocated in the same NUMA node as the GK/GT/GK-GT-unit blocks.
-	local cpsf = require("cps")
-	local cps_conf = cpsf(net_conf, gk_conf, gt_conf, lls_conf, numa_table)
+	--local cpsf = require("cps")
+	--local cps_conf = cpsf(net_conf, gk_conf, gt_conf, lls_conf, numa_table)
 
 	local dyf = require("dyn_cfg")
 	local dy_conf = dyf(net_conf, gk_conf, gt_conf, numa_table)
