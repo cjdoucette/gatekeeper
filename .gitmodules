@@ -8,3 +8,6 @@
 	path = dependencies/bird
 	url = http://github.com/cjdoucette/bird.git
 	branch = gatekeeper
+[submodule "dependencies/redis-lua"]
+	path = dependencies/redis-lua
+	url = https://github.com/nrk/redis-lua

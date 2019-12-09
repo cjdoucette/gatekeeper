@@ -173,9 +173,67 @@ local function lookup_lpm_policy(pkt_info)
 	return nil
 end
 
+function ipv6_bytes_to_str(ipv6_bytes)
+	s = {}
+	print(getn(ipv6_bytes))
+	for i = 1, getn(ipv6_bytes) do
+		s[i] = strchar(bytes[i])
+	end
+	return concat(s)
+end
+
+function check_spoofed(pkt_info)
+	local gk_src
+	local cli_src
+
+	-- Get GK server's IP address.
+	if pkt_info.outer_ethertype == policylib.c.IPV4 then
+		local outer_ipv4_hdr = ffi.cast("struct rte_ipv4_hdr *",
+			pkt_info.outer_l3_hdr)
+		gk_src = 'ipv4:' + tostring(outer_ipv4_hdr.src_addr)
+	end	
+	if pkt_info.outer_ethertype == policylib.c.IPV6 then
+		local outer_ipv6_hdr = ffi.cast("struct rte_ipv6_hdr *",
+			pkt_info.outer_l3_hdr)
+		gk_src = 'ipv6:' + ipv6_bytes_to_str(outer_ipv6_hdr.src_addr) 
+	end	
+
+	-- Get client's IP address.
+	if pkt_info.inner_ip_ver == policylib.c.IPV4 then
+		local inner_ipv4_hdr = ffi.cast("struct rte_ipv4_hdr *",
+			pkt_info.inner_l3_hdr)
+		cli_src = 'ipv4:' + tostring(inner_ipv4_hdr.src_addr)
+	end
+	if pkt_info.inner_ip_ver == policylib.c.IPV6 then
+		local inner_ipv6_hdr = ffi.cast("struct rte_ipv6_hdr *",
+			pkt_info.inner_l3_hdr)
+		cli_src = 'ipv6:' + ipv6_bytes_to_str(inner_ipv6_hdr.src_addr) 
+	end
+
+	entry = redis_db.get(cli_src)
+	if entry == nil then
+		redis_db.set(cli_src, gk_src)
+		return false
+	end
+
+	-- Client IP was seen before with a different GK server.
+	if entry ~= gk_src then
+		return true
+	end
+
+	return false
+end
+
 function lookup_policy(pkt_info, policy)
 
 	local group
+
+	if redis_db ~= nil then
+		local spoofed = check_spoofed(pkt_info)
+		if spoofed then
+			return dcs_declined(policy)
+		end
+	end
 
 	group = lookup_lpm_policy(pkt_info)
 

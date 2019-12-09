@@ -68,6 +68,9 @@ autoreconf
 make
 sudo make install
 
+# Get LuaSocket for Grantor traffic analysis.
+sudo luarocks install luasocket
+
 cd ../../
 
 # Build interface name -> PCI address map.

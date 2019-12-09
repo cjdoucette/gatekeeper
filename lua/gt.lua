@@ -9,6 +9,7 @@ return function (net_conf, lls_conf, numa_table)
 	local log_level = staticlib.c.RTE_LOG_DEBUG
 	local lua_policy_file = "examples/policy.lua"
 	local lua_base_directory = "./lua"
+	local use_redis_db = true
 
 	-- XXX #155 These parameters should only be changed for performance reasons.
 	local mailbox_max_entries_exp = 7
@@ -34,6 +35,8 @@ return function (net_conf, lls_conf, numa_table)
 	-- These variables are unlikely to need to be changed.
 	local ggu_src_port = 0xA0A0
 	local ggu_dst_port = 0xB0B0
+	local redis_server_ip_str = "127.0.0.1"
+	local redis_server_port = 6379
 
 	--
 	-- End configuration of GT block.
@@ -78,6 +81,12 @@ return function (net_conf, lls_conf, numa_table)
 	lls_conf.mailbox_max_pkt_sub =
 		math.max(lls_conf.mailbox_max_pkt_sub,
 		gt_conf.max_pkt_burst)
+
+	if use_redis_db then
+		local policylib = require("gatekeeper/policylib")
+		policylib.redis_db_connect(redis_server_ip_str,
+			redis_server_port)
+	end
 
 	local gt_lcores = staticlib.alloc_lcores_from_same_numa(numa_table,
 		n_lcores)

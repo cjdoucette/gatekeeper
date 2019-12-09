@@ -1,4 +1,5 @@
 module(..., package.seeall)
+local redis = require ('dependencies/redis-lua/src/redis')
 
 --
 -- C functions exported through FFI
@@ -280,4 +281,17 @@ function decision_web(policy, tx_rate_kib_sec, cap_expire_sec,
 	return decision_grantedv2_will_full_params(BPF_INDEX_WEB,
 		policy, tx_rate_kib_sec, tx_rate_kib_sec * 0.05, -- 5%
 		cap_expire_sec, next_renewal_ms, renewal_step_ms, false)
+end
+
+function redis_db_connect(redis_server_ip_str, redis_server_port)
+	local params = {
+		host = redis_server_ip_str,
+		port = redis_server_port,
+	}
+
+	redis_db = redis.connect(params)
+
+	redis_db:set('foo', 'bar')
+	local value = redis_db:get('foo')
+	print(value)
 end
