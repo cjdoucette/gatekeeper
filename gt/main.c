@@ -935,6 +935,10 @@ prep_notify_pkt(struct ggu_notify_pkt *ggu_pkt)
 
 		/* Offload the UDP checksum. */
 		notify_udp = (struct rte_udp_hdr *)&notify_ipv4[1];
+		notify_udp->dgram_len =
+			rte_cpu_to_be_16((uint16_t)(ggu_pkt->buf->data_len -
+				ggu_pkt->buf->l2_len - ggu_pkt->buf->l3_len));
+		notify_udp->dgram_cksum = 0;
 		notify_udp->dgram_cksum =
 			rte_ipv4_phdr_cksum(notify_ipv4,
 				ggu_pkt->buf->ol_flags);
@@ -948,6 +952,10 @@ prep_notify_pkt(struct ggu_notify_pkt *ggu_pkt)
 
 		/* Offload the UDP checksum. */
 		notify_udp = (struct rte_udp_hdr *)&notify_ipv6[1];
+		notify_udp->dgram_len =
+			rte_cpu_to_be_16((uint16_t)(ggu_pkt->buf->data_len -
+				ggu_pkt->buf->l2_len - ggu_pkt->buf->l3_len));
+		notify_udp->dgram_cksum = 0;
 		notify_udp->dgram_cksum =
 			rte_ipv6_phdr_cksum(notify_ipv6,
 				ggu_pkt->buf->ol_flags);
@@ -955,10 +963,6 @@ prep_notify_pkt(struct ggu_notify_pkt *ggu_pkt)
 		rte_panic("Unexpected condition: gt at lcore %u sending notification packet to Gatekeeper server with unknown IP version %hu\n",
 			rte_lcore_id(), ggu_pkt->ipaddr.proto);
 	}
-
-	notify_udp->dgram_len =
-		rte_cpu_to_be_16((uint16_t)(ggu_pkt->buf->data_len -
-			ggu_pkt->buf->l2_len - ggu_pkt->buf->l3_len));
 }
 
 static void
