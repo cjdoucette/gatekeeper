@@ -21,6 +21,7 @@
 #include <math.h>
 #include <linux/icmp.h>
 #include <linux/icmpv6.h>
+#include <arpa/inet.h>
 
 #include <rte_ip.h>
 #include <rte_log.h>
@@ -157,6 +158,17 @@ extract_packet_info(struct rte_mbuf *pkt, struct ipacket *packet,
 
 		ip4_hdr = packet->l3_hdr;
 		packet->flow.proto = RTE_ETHER_TYPE_IPV4;
+		if (ip4_hdr->next_proto_id == IPPROTO_IPIP) {
+			GK_LOG(NOTICE, "Incoming packet was IPIP\n");
+		//	rte_pktmbuf_dump(log_file, pkt, pkt->data_len);
+			struct rte_ipv4_hdr *inner_ip4_hdr = &ip4_hdr[1];
+			rte_memcpy(((uint8_t *)inner_ip4_hdr) - ether_len,
+				eth_hdr, ether_len);
+			eth_hdr = (struct rte_ether_hdr *)rte_pktmbuf_adj(pkt, sizeof(*ip4_hdr));
+		//	rte_pktmbuf_dump(log_file, pkt, pkt->data_len);
+			ip4_hdr = inner_ip4_hdr;
+			packet->l3_hdr = ip4_hdr;
+		}
 		packet->flow.f.v4.src.s_addr = ip4_hdr->src_addr;
 		packet->flow.f.v4.dst.s_addr = ip4_hdr->dst_addr;
 		if (ip4_hdr->next_proto_id == IPPROTO_TCP)
@@ -205,35 +217,7 @@ extract_packet_info(struct rte_mbuf *pkt, struct ipacket *packet,
 	/* Use the GK block to proxy connections. */
 	if (strcmp(other_side->name, "back") == 0) {
 		if (ip4_hdr != NULL) {
-			uint32_t new_src_addr;
-			uint32_t new_dst_addr;
-
-			/* Make NAT (back interface) the source of the packet. */
-			new_src_addr = ntohl(other_side->ip4_addr.s_addr);
-			new_src_addr &= 0xFFFF0000;
-			new_src_addr |= 0x00000350;
-			ip4_hdr->src_addr = htonl(new_src_addr);
-
-			/* Assume destination is at 172.31.3.200. */
-			new_dst_addr = ntohl(ip4_hdr->dst_addr);
-			new_dst_addr &= 0xFFFF0000;
-			new_dst_addr |= 0x00000300 | 0xC8;
-			ip4_hdr->dst_addr = htonl(new_dst_addr);
-
-			/* Update flow data structure. */
-			packet->flow.f.v4.src.s_addr = ip4_hdr->src_addr;
-			packet->flow.f.v4.dst.s_addr = ip4_hdr->dst_addr;
-
-			/* Recompute checksums. */
-			ip4_hdr->hdr_checksum = 0;
-			if (tcp_hdr != NULL) {
-				tcp_hdr->cksum = 0;
-				tcp_hdr->cksum = rte_ipv4_udptcp_cksum(ip4_hdr, tcp_hdr);
-			} else if (udp_hdr != NULL) {
-				udp_hdr->dgram_cksum = 0;
-				udp_hdr->dgram_cksum = rte_ipv4_udptcp_cksum(ip4_hdr, udp_hdr);
-			}
-			ip4_hdr->hdr_checksum = rte_ipv4_cksum(ip4_hdr);
+			//GK_LOG(NOTICE, "This is where we would usually do NAT\n");
 		} else if (ip6_hdr != NULL) {
 			if (ip6_hdr->src_addr[0] == 0xfe || ip6_hdr->dst_addr[0] == 0xfe)
 				goto out;
@@ -418,6 +402,49 @@ pkt_copy_cached_eth_header(struct rte_mbuf *pkt, struct ether_cache *eth_cache,
 	return stale;
 }
 
+static void
+print_flow(struct ip_flow *flow)
+{
+	char src[128];
+	char dst[128];
+
+	if (flow->proto == RTE_ETHER_TYPE_IPV4) {
+		if (inet_ntop(AF_INET, &flow->f.v4.src,
+				src, sizeof(src)) == NULL) {
+			G_LOG(ERR, "flow: %s: failed to convert a number to an IPv4 address (%s)\n",
+				__func__, strerror(errno));
+			return;
+		}
+
+		if (inet_ntop(AF_INET, &flow->f.v4.dst,
+				dst, sizeof(dst)) == NULL) {
+			G_LOG(ERR, "flow: %s: failed to convert a number to an IPv4 address (%s)\n",
+				__func__, strerror(errno));
+			return;
+		}
+	} else if (likely(flow->proto == RTE_ETHER_TYPE_IPV6)) {
+		if (inet_ntop(AF_INET6, flow->f.v6.src.s6_addr,
+				src, sizeof(src)) == NULL) {
+			G_LOG(ERR, "flow: %s: failed to convert a number to an IPv6 address (%s)\n",
+				__func__, strerror(errno));
+			return;
+		}
+
+		if (inet_ntop(AF_INET6, flow->f.v6.dst.s6_addr,
+				dst, sizeof(dst)) == NULL) {
+			G_LOG(ERR, "flow: %s: failed to convert a number to an IPv6 address (%s)\n",
+				__func__, strerror(errno));
+			return;
+		}
+	} else
+		rte_panic("Unexpected condition at %s: unknown flow type %hu\n",
+			__func__, flow->proto);
+
+//	G_LOG(ERR,
+//		"flow has IP source address %s, and destination address %s\n",
+//		src, dst);
+}
+
 /* 
  * When a flow entry is at request state, all the GK block processing
  * that entry does is to:
@@ -441,6 +468,7 @@ gk_process_request(struct flow_entry *fe, struct ipacket *packet,
 	struct gk_fib *fib = fe->grantor_fib;
 	struct ether_cache *eth_cache;
 
+	print_flow(&fe->flow);
 	fe->u.request.last_packet_seen_at = now;
 
 	/*
@@ -777,8 +805,10 @@ gk_hash_add_flow_entry(struct gk_instance *instance,
 
 	ret = rte_hash_add_key_with_hash(
 		instance->ip_flow_hash_table, flow, rss_hash_val);
-	if (ret == -ENOSPC)
+	if (ret == -ENOSPC) {
+		//GK_LOG(NOTICE, "GK flow table is full\n");
 		instance->num_scan_del = gk_conf->scan_del_thresh;
+	}
 
 	return ret;
 }
