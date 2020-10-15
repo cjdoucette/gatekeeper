@@ -159,7 +159,7 @@ extract_packet_info(struct rte_mbuf *pkt, struct ipacket *packet,
 		ip4_hdr = packet->l3_hdr;
 		packet->flow.proto = RTE_ETHER_TYPE_IPV4;
 		if (ip4_hdr->next_proto_id == IPPROTO_IPIP) {
-			GK_LOG(NOTICE, "Incoming packet was IPIP\n");
+		//	GK_LOG(NOTICE, "Incoming packet was IPIP\n");
 		//	rte_pktmbuf_dump(log_file, pkt, pkt->data_len);
 			struct rte_ipv4_hdr *inner_ip4_hdr = &ip4_hdr[1];
 			rte_memcpy(((uint8_t *)inner_ip4_hdr) - ether_len,
