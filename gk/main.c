@@ -361,7 +361,7 @@ gk_process_request(struct flow_entry *fe, struct ipacket *packet,
 
 	/* Encapsulate the packet as a request. */
 	ret = encapsulate(packet->pkt, priority,
-		&sol_conf->net->back, &fib->u.grantor.gt_addr);
+		&sol_conf->net->back, &fib->u.grantor.gt_addr1);
 	if (ret < 0)
 		return ret;
 
@@ -435,7 +435,7 @@ gk_process_granted(struct flow_entry *fe, struct ipacket *packet,
 	 * enter destination according to @fe->grantor_fib.
 	 */
 	ret = encapsulate(packet->pkt, priority,
-		&sol_conf->net->back, &fib->u.grantor.gt_addr);
+		&sol_conf->net->back, &fib->u.grantor.gt_addr1);
 	if (ret < 0)
 		return ret;
 
@@ -792,7 +792,7 @@ print_flow_state(struct flow_entry *fe)
 		goto out;
 	}
 
-	ret = convert_ip_to_str(&fe->grantor_fib->u.grantor.gt_addr,
+	ret = convert_ip_to_str(&fe->grantor_fib->u.grantor.gt_addr1,
 		ip, sizeof(ip));
 	if (ret < 0) {
 		ret = snprintf(state_msg, sizeof(state_msg),

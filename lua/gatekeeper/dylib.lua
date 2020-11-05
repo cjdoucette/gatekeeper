@@ -44,7 +44,7 @@ struct ipaddr {
 struct gk_fib_dump_entry {
 	struct ipaddr addr;
 	int           prefix_len;
-	struct ipaddr grantor_ip;
+	struct ipaddr grantor1_ip;
 	bool          stale;
 	struct ipaddr nexthop_ip;
 	struct rte_ether_addr d_addr;
@@ -125,7 +125,7 @@ function print_fib_dump_entry(fib_dump_entry, acc)
 		fib_action_to_str(fib_dump_entry.action)
 
 	if fib_dump_entry.action == c.GK_FWD_GRANTOR then
-		ip_addr_str = dylib.ip_format_addr(fib_dump_entry.grantor_ip)
+		ip_addr_str = dylib.ip_format_addr(fib_dump_entry.grantor1_ip)
 		acc = acc .. "\n\tGrantor IP address: " .. ip_addr_str
 	end
 

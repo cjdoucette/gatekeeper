@@ -157,7 +157,7 @@ struct gk_fib {
 		 	 * When the action is GK_FWD_GRANTOR, we need
 			 * the Grantor IP address.
 		 	 */
-			struct ipaddr gt_addr;
+			struct ipaddr gt_addr1;
 
 			/* The cached Ethernet header. */
 			struct ether_cache *eth_cache;
@@ -222,7 +222,7 @@ struct gk_fib_dump_entry {
 	int           prefix_len;
 
 	/* The Grantor IP address. */
-	struct ipaddr grantor_ip;
+	struct ipaddr grantor1_ip;
 
 	bool          stale;
 
