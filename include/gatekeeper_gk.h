@@ -411,4 +411,14 @@ gk_conf_hold(struct gk_config *gk_conf)
 int gk_init_bpf_cookie(const struct gk_config *gk_conf, uint8_t program_index,
 	struct gk_bpf_cookie *cookie);
 
+static inline struct ipaddr *
+load_balance_grantor(struct gk_fib *gt_fib, struct flow_entry *fe)
+{
+	if ((gt_fib->u.grantor.gt_addr2.proto != 0) &&
+			(fe->flow_hash_val % 2 == 1)) {
+		return &gt_fib->u.grantor.gt_addr2;
+	}
+	return &gt_fib->u.grantor.gt_addr1;
+}
+
 #endif /* _GATEKEEPER_GK_H_ */

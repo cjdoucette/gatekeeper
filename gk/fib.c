@@ -1685,6 +1685,149 @@ del_fib_entry(const char *ip_prefix, struct gk_config *gk_conf)
 	return del_fib_entry_numerical(&prefix_info, gk_conf);
 }
 
+/* This function should only be called by change_fib_second_grantor(). */
+static int
+change_second_grantor_locked(struct ip_prefix *ip_prefix,
+	struct ipaddr *gt_addr, struct gk_config *gk_conf, bool to_del)
+{
+	int ip_prefix_present;
+	struct gk_fib *gt_fib;
+	struct gk_lpm *ltbl = &gk_conf->lpm_tbl;
+
+	if (ip_prefix->addr.proto == RTE_ETHER_TYPE_IPV4) {
+		uint32_t fib_id;
+
+		ip_prefix_present = rte_lpm_is_rule_present(
+			ltbl->lpm, ntohl(ip_prefix->addr.ip.v4.s_addr),
+			ip_prefix->len, &fib_id);
+		if (ip_prefix_present == 0) {
+			GK_LOG(WARNING,
+				"Failed to change second Grantor IP due to non-existent IP prefix (%s)\n",
+				ip_prefix->str);
+			return -1;
+		} else if (ip_prefix_present < 0) {
+			GK_LOG(ERR,
+				"Failed to call rte_lpm_is_rule_present() for IP prefix (%s) when changing second Grantor IP\n",
+				ip_prefix->str);
+			return -1;
+		}
+
+		gt_fib = &ltbl->fib_tbl[fib_id];
+	} else if (likely(ip_prefix->addr.proto == RTE_ETHER_TYPE_IPV6)) {
+		uint32_t fib_id;
+
+		ip_prefix_present = rte_lpm6_is_rule_present(
+			ltbl->lpm6, ip_prefix->addr.ip.v6.s6_addr,
+			ip_prefix->len, &fib_id);
+		if (ip_prefix_present == 0) {
+			GK_LOG(WARNING,
+				"Failed to change second Grantor IP due to non-existent IP prefix (%s)\n",
+				ip_prefix->str);
+			return -1;
+		} else if (ip_prefix_present < 0) {
+			GK_LOG(ERR,
+				"Failed to call rte_lpm6_is_rule_present() for IP prefix (%s) when changing second Grantor IP\n",
+				ip_prefix->str);
+			return -1;
+		}
+
+		gt_fib = &ltbl->fib_tbl6[fib_id];
+	} else {
+		GK_LOG(WARNING,
+			"Failed to change the second Grantor IP for an IP prefix (%s) due to unknown IP type %hu\n",
+			ip_prefix->str, ip_prefix->addr.proto);
+		return -1;
+	}
+
+	if (gt_fib->action != GK_FWD_GRANTOR) {
+		GK_LOG(ERR, "Failed to change the second Grantor IP for an IP prefix (%s); existing FIB entry has type %d\n",
+			ip_prefix->str, gt_fib->action);
+		return -1;
+	}
+
+	if (!to_del && (gt_fib->u.grantor.gt_addr1.proto != gt_addr->proto)) {
+		GK_LOG(ERR, "Failed to update the second Grantor IP for an IP prefix (%s); existing Grantor IP is different protocol (%hu) than requested second Grantor IP (%hu)\n",
+			ip_prefix->str, gt_fib->u.grantor.gt_addr1.proto,
+			gt_addr->proto);
+		return -1;
+	}
+
+	if (to_del) {
+		memset(&gt_fib->u.grantor.gt_addr2, 0,
+			sizeof(gt_fib->u.grantor.gt_addr2));
+	} else {
+		rte_memcpy(&gt_fib->u.grantor.gt_addr2,
+			gt_addr, sizeof(gt_fib->u.grantor.gt_addr2));
+	}
+
+	return 0;
+}
+
+static int
+change_fib_second_grantor(const char *prefix, const char *gt_ip,
+	struct gk_config *gk_conf, bool to_del)
+{
+	int ret;
+	struct ip_prefix prefix_info;
+	struct ipaddr gt_addr;
+	struct ipaddr *gt_para;
+
+	if (!to_del && gt_ip == NULL) {
+		GK_LOG(ERR,
+			"Failed to update second Grantor IP for IP prefix %s; no IP address given\n",
+			prefix);
+		return -1;
+	}
+
+	if (to_del) {
+		RTE_VERIFY(gt_ip == NULL);
+		gt_para = NULL;
+	} else {
+		if (gt_ip == NULL) {
+			GK_LOG(ERR,
+				"Failed to update second Grantor IP for IP prefix %s; no IP address given\n",
+				prefix);
+			return -1;
+		}
+		ret = convert_str_to_ip(gt_ip, &gt_addr);
+		if (ret < 0)
+			return -1;
+		gt_para = &gt_addr;
+	}
+
+	prefix_info.str = prefix;
+	prefix_info.len = parse_ip_prefix(prefix, &prefix_info.addr);
+
+	if (prefix_info.len < 0)
+		return -1;
+
+	if (prefix_info.len == 0) {
+		GK_LOG(WARNING,
+			"Gatekeeper currently doesn't support default routes (prefix %s with length zero in %s)\n",
+			prefix_info.str, __func__);
+		return -1;
+	}
+
+	rte_spinlock_lock_tm(&gk_conf->lpm_tbl.lock);
+	ret = change_second_grantor_locked(&prefix_info,
+		gt_para, gk_conf, to_del);
+	rte_spinlock_unlock_tm(&gk_conf->lpm_tbl.lock);
+	return ret;
+}
+
+int
+update_fib_second_grantor(const char *prefix, const char *gt_ip,
+	struct gk_config *gk_conf)
+{
+	return change_fib_second_grantor(prefix, gt_ip, gk_conf, false);
+}
+
+int
+del_fib_second_grantor(const char *prefix, struct gk_config *gk_conf)
+{
+	return change_fib_second_grantor(prefix, NULL, gk_conf, true);
+}
+
 static void
 fillup_gk_fib_dump_entry_ether(struct gk_fib_dump_entry *dentry,
 	struct ether_cache *eth_cache)

@@ -280,6 +280,10 @@ int del_fib_entry_numerical(
 	struct ip_prefix *prefix_info, struct gk_config *gk_conf);
 int del_fib_entry(const char *ip_prefix, struct gk_config *gk_conf);
 
+int update_fib_second_grantor(const char *prefix, const char *gt_ip,
+	struct gk_config *gk_conf);
+int del_fib_second_grantor(const char *prefix, struct gk_config *gk_conf);
+
 int l_list_gk_fib4(lua_State *l);
 int l_list_gk_fib6(lua_State *l);
 int l_list_gk_neighbors4(lua_State *l);

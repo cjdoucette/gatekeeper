@@ -76,6 +76,10 @@ int add_fib_entry(const char *prefix, const char *gt_ip, const char *gw_ip,
 	enum gk_fib_action action, struct gk_config *gk_conf);
 int del_fib_entry(const char *ip_prefix, struct gk_config *gk_conf);
 
+int update_fib_second_grantor(const char *prefix, const char *gt_ip,
+	struct gk_config *gk_conf);
+int del_fib_second_grantor(const char *prefix, struct gk_config *gk_conf);
+
 int gk_flush_flow_table(const char *src_prefix,
 	const char *dst_prefix, struct gk_config *gk_conf);
 int gk_log_flow_state(const char *src_addr,

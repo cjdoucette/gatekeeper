@@ -330,6 +330,7 @@ gk_process_request(struct flow_entry *fe, struct ipacket *packet,
 			fe->u.request.last_packet_seen_at);
 	struct gk_fib *fib = fe->grantor_fib;
 	struct ether_cache *eth_cache;
+	struct ipaddr *gt_addr;
 
 	fe->u.request.last_packet_seen_at = now;
 
@@ -359,9 +360,12 @@ gk_process_request(struct flow_entry *fe, struct ipacket *packet,
 
 	/* The assigned priority is @priority. */
 
+	/* Load balance to one of two Grantors, if applicable. */
+	gt_addr = load_balance_grantor(fib, fe);
+
 	/* Encapsulate the packet as a request. */
 	ret = encapsulate(packet->pkt, priority,
-		&sol_conf->net->back, &fib->u.grantor.gt_addr1);
+		&sol_conf->net->back, gt_addr);
 	if (ret < 0)
 		return ret;
 
@@ -401,6 +405,7 @@ gk_process_granted(struct flow_entry *fe, struct ipacket *packet,
 	struct gk_fib *fib = fe->grantor_fib;
 	struct ether_cache *eth_cache;
 	uint32_t pkt_len;
+	struct ipaddr *gt_addr;
 
 	if (now >= fe->expire_at) {
 		reinitialize_flow_entry(fe, now);
@@ -429,13 +434,16 @@ gk_process_granted(struct flow_entry *fe, struct ipacket *packet,
 		priority = PRIORITY_RENEW_CAP;
 	}
 
+	/* Load balance to one of two Grantors, if applicable. */
+	gt_addr = load_balance_grantor(fib, fe);
+
 	/*
 	 * Encapsulate packet as a granted packet,
 	 * mark it as a capability renewal request if @renew_cap is true,
 	 * enter destination according to @fe->grantor_fib.
 	 */
 	ret = encapsulate(packet->pkt, priority,
-		&sol_conf->net->back, &fib->u.grantor.gt_addr1);
+		&sol_conf->net->back, gt_addr);
 	if (ret < 0)
 		return ret;
 

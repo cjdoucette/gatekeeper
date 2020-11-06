@@ -236,12 +236,14 @@ gk_bpf_prep_for_tx(struct gk_bpf_pkt_ctx *ctx, int priority,
 	if (unlikely(priority < 0 || priority > PRIORITY_MAX))
 		return -EINVAL;
 
+	/* Load balance to one of two Grantors, if applicable. */
 	ret = (direct_if_possible != 0 && priority == PRIORITY_GRANTED)
 		? update_pkt_priority(frame->packet, priority,
 			&frame->gk_conf->net->back)
 		: encapsulate(frame->packet->pkt, priority,
 			&frame->gk_conf->net->back,
-			&frame->fe->grantor_fib->u.grantor.gt_addr1);
+			load_balance_grantor(frame->fe->grantor_fib,
+				frame->fe));
 
 	frame->ready_to_tx = ret == 0;
 	return ret;

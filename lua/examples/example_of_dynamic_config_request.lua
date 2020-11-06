@@ -21,6 +21,12 @@ if ret < 0 then
 	return "gk: failed to add an FIB entry\n"
 end
 
+ret = dylib.c.update_fib_second_grantor("198.51.100.0/24",
+	"203.0.113.2", dyc.gk)
+if ret < 0 then
+	return "gk: failed to add second Grantor IP to FIB entry\n"
+end
+
 -- Examples of temporarily changing global and block log levels.
 local old_log_level = staticlib.c.rte_log_get_global_level()
 staticlib.c.rte_log_set_global_level(staticlib.c.RTE_LOG_ERR)
@@ -86,6 +92,11 @@ reply_msg = reply_msg .. dylib.list_gk_neighbors4(dyc.gk,
 	dylib.print_neighbor_dump_entry, acc_start)
 reply_msg = reply_msg .. dylib.list_gk_neighbors6(dyc.gk,
 	dylib.print_neighbor_dump_entry, acc_start)
+
+ret = dylib.c.del_fib_second_grantor("198.51.100.0/24", dyc.gk)
+if ret < 0 then
+	return "gk: failed to delete second Grantor IP from FIB entry\n"
+end
 
 ret = dylib.c.del_fib_entry("198.51.100.0/24", dyc.gk)
 if ret < 0 then
