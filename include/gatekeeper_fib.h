@@ -156,8 +156,12 @@ struct gk_fib {
 			/*
 		 	 * When the action is GK_FWD_GRANTOR, we need
 			 * the Grantor IP address.
+			 *
+			 * Maintain up to two Grantor addresses
+			 * for load balancing.
 		 	 */
 			struct ipaddr gt_addr1;
+			struct ipaddr gt_addr2;
 
 			/* The cached Ethernet header. */
 			struct ether_cache *eth_cache;
@@ -221,9 +225,12 @@ struct gk_fib_dump_entry {
 
 	int           prefix_len;
 
-	/* The Grantor IP address. */
+	/* The Grantor IP addresses. */
 	struct ipaddr grantor1_ip;
+	struct ipaddr grantor2_ip;
 
+	/* Whether @grantor2_ip represents a valid address. */
+	bool          second_ip;
 	bool          stale;
 
 	/* The IP address of the nexthop. */

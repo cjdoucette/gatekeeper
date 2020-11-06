@@ -776,8 +776,10 @@ static void
 print_flow_state(struct flow_entry *fe)
 {
 	int ret;
-	char ip[MAX_INET_ADDRSTRLEN];
+	char ip1[MAX_INET_ADDRSTRLEN];
+	char ip2[MAX_INET_ADDRSTRLEN];
 	char state_msg[1024];
+	bool first_gt = true;
 
 	if (unlikely(fe->grantor_fib == NULL)) {
 		ret = snprintf(state_msg, sizeof(state_msg),
@@ -793,26 +795,43 @@ print_flow_state(struct flow_entry *fe)
 	}
 
 	ret = convert_ip_to_str(&fe->grantor_fib->u.grantor.gt_addr1,
-		ip, sizeof(ip));
+		ip1, sizeof(ip1));
 	if (ret < 0) {
 		ret = snprintf(state_msg, sizeof(state_msg),
-			"gk: flow with invalid FIB entry [action: %hhu] in the flow table at %s with lcore %u - failed to convert the Grantor IP address to string",
+			"gk: flow with invalid FIB entry [action: %hhu] in the flow table at %s with lcore %u - failed to convert the Grantor IP (1) address to string",
 			fe->grantor_fib->action, __func__, rte_lcore_id());
 		goto out;
+	}
+
+	if (fe->grantor_fib->u.grantor.gt_addr2.proto != 0) {
+		first_gt = fe->flow_hash_val % 2 == 0;
+		ret = convert_ip_to_str(&fe->grantor_fib->u.grantor.gt_addr2,
+			ip2, sizeof(ip2));
+		if (ret < 0) {
+			ret = snprintf(state_msg, sizeof(state_msg),
+				"gk: flow with invalid FIB entry [action: %hhu] in the flow table at %s with lcore %u - failed to convert the Grantor IP (2) address to string",
+				fe->grantor_fib->action, __func__, rte_lcore_id());
+			goto out;
+		}
+	} else {
+		ret = snprintf(ip2, sizeof(ip2), "none");
+		RTE_VERIFY(ret > 0 && ret < (int)sizeof(ip2));
 	}
 
 	switch (fe->state) {
 	case GK_REQUEST:
 		ret = snprintf(state_msg, sizeof(state_msg),
-			"gk: log the flow state [state: GK_REQUEST (%hhu), flow hash value: %u, last_packet_seen_at: %"PRIx64", last_priority: %hhu, allowance: %hhu, grantor_ip: %s] in the flow table at %s with lcore %u",
+			"gk: log the flow state [state: GK_REQUEST (%hhu), flow hash value: %u, last_packet_seen_at: %"PRIx64", last_priority: %hhu, allowance: %hhu, grantor_ip (1%s): %s, grantor_ip (2%s): %s] in the flow table at %s with lcore %u",
 			fe->state, fe->flow_hash_val,
 			fe->u.request.last_packet_seen_at,
 			fe->u.request.last_priority, fe->u.request.allowance,
-			ip, __func__, rte_lcore_id());
+			first_gt ? "*" : "", ip1,
+			first_gt ? "" : "*", ip2,
+			__func__, rte_lcore_id());
 		break;
 	case GK_GRANTED:
 		ret = snprintf(state_msg, sizeof(state_msg),
-			"gk: log the flow state [state: GK_GRANTED (%hhu), flow hash value: %u, expire_at: %"PRIx64", budget_renew_at: %"PRIx64", tx_rate_kib_cycle: %u, budget_byte: %"PRIx64", send_next_renewal_at: %"PRIx64", renewal_step_cycle: %"PRIx64", grantor_ip: %s] in the flow table at %s with lcore %u",
+			"gk: log the flow state [state: GK_GRANTED (%hhu), flow hash value: %u, expire_at: %"PRIx64", budget_renew_at: %"PRIx64", tx_rate_kib_cycle: %u, budget_byte: %"PRIx64", send_next_renewal_at: %"PRIx64", renewal_step_cycle: %"PRIx64", grantor_ip (1%s): %s, grantor_ip (2%s): %s] in the flow table at %s with lcore %u",
 			fe->state, fe->flow_hash_val,
 			fe->expire_at,
 			fe->u.granted.budget_renew_at,
@@ -820,13 +839,17 @@ print_flow_state(struct flow_entry *fe)
 			fe->u.granted.budget_byte,
 			fe->u.granted.send_next_renewal_at,
 			fe->u.granted.renewal_step_cycle,
-			ip, __func__, rte_lcore_id());
+			first_gt ? "*" : "", ip1,
+			first_gt ? "" : "*", ip2,
+			__func__, rte_lcore_id());
 		break;
 	case GK_DECLINED:
 		ret = snprintf(state_msg, sizeof(state_msg),
-			"gk: log the flow state [state: GK_DECLINED (%hhu), flow hash value: %u, expire_at: %"PRIx64", grantor_ip: %s] in the flow table at %s with lcore %u",
+			"gk: log the flow state [state: GK_DECLINED (%hhu), flow hash value: %u, expire_at: %"PRIx64", grantor_ip (1%s): %s, grantor_ip (2%s): %s] in the flow table at %s with lcore %u",
 			fe->state, fe->flow_hash_val, fe->expire_at,
-			ip, __func__, rte_lcore_id());
+			first_gt ? "*" : "", ip1,
+			first_gt ? "" : "*", ip2,
+			__func__, rte_lcore_id());
 		break;
 	case GK_BPF: {
 		uint64_t *c = fe->u.bpf.cookie.mem;
@@ -836,14 +859,16 @@ print_flow_state(struct flow_entry *fe)
 		ret = snprintf(state_msg, sizeof(state_msg),
 			"gk: log the flow state [state: GK_BPF (%hhu), flow hash value: %u, expire_at: 0x%"PRIx64", program_index=%u, cookie="
 			"%016" PRIx64 ", %016" PRIx64 ", %016" PRIx64 ", %016" PRIx64
-			", %016" PRIx64 ", %016" PRIx64 ", %016" PRIx64 ", %016" PRIx64 ", grantor_ip: %s] in the flow table at %s with lcore %u",
+			", %016" PRIx64 ", %016" PRIx64 ", %016" PRIx64 ", %016" PRIx64 ", grantor_ip (1%s): %s, grantor_ip (2%s): %s] in the flow table at %s with lcore %u",
 			fe->state, fe->flow_hash_val,
 			fe->expire_at, fe->program_index,
 			rte_cpu_to_be_64(c[0]), rte_cpu_to_be_64(c[1]),
 			rte_cpu_to_be_64(c[2]), rte_cpu_to_be_64(c[3]),
 			rte_cpu_to_be_64(c[4]), rte_cpu_to_be_64(c[5]),
 			rte_cpu_to_be_64(c[6]), rte_cpu_to_be_64(c[7]),
-			ip, __func__, rte_lcore_id());
+			first_gt ? "*" : "", ip1,
+			first_gt ? "" : "*", ip2,
+			 __func__, rte_lcore_id());
 		break;
 	}
 	default:

@@ -1256,6 +1256,8 @@ init_grantor_fib_locked(
 	gt_fib->action = GK_FWD_GRANTOR;
 	rte_memcpy(&gt_fib->u.grantor.gt_addr1,
 		gt_addr, sizeof(gt_fib->u.grantor.gt_addr1));
+	memset(&gt_fib->u.grantor.gt_addr2, 0,
+		sizeof(gt_fib->u.grantor.gt_addr2));
 	gt_fib->u.grantor.eth_cache = eth_cache;
 
 	ret = lpm_add_route(&ip_prefix->addr, ip_prefix->len, fib_id, ltbl);
@@ -1702,6 +1704,12 @@ fillup_gk_fib_dump_entry(struct gk_fib_dump_entry *dentry, struct gk_fib *fib)
 	case GK_FWD_GRANTOR:
 		rte_memcpy(&dentry->grantor1_ip, &fib->u.grantor.gt_addr1,
 			sizeof(dentry->grantor1_ip));
+		dentry->second_ip = fib->u.grantor.gt_addr2.proto != 0;
+		if (dentry->second_ip) {
+			rte_memcpy(&dentry->grantor2_ip,
+				&fib->u.grantor.gt_addr2,
+				sizeof(dentry->grantor2_ip));
+		}
 		fillup_gk_fib_dump_entry_ether(dentry,
 			fib->u.grantor.eth_cache);
 		break;

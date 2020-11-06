@@ -45,6 +45,8 @@ struct gk_fib_dump_entry {
 	struct ipaddr addr;
 	int           prefix_len;
 	struct ipaddr grantor1_ip;
+	struct ipaddr grantor2_ip;
+	bool          second_ip;
 	bool          stale;
 	struct ipaddr nexthop_ip;
 	struct rte_ether_addr d_addr;
@@ -125,8 +127,14 @@ function print_fib_dump_entry(fib_dump_entry, acc)
 		fib_action_to_str(fib_dump_entry.action)
 
 	if fib_dump_entry.action == c.GK_FWD_GRANTOR then
-		ip_addr_str = dylib.ip_format_addr(fib_dump_entry.grantor1_ip)
-		acc = acc .. "\n\tGrantor IP address: " .. ip_addr_str
+		ip1_addr_str = dylib.ip_format_addr(fib_dump_entry.grantor1_ip)
+		acc = acc .. "\n\tGrantor IP address (1): " .. ip1_addr_str
+		if fib_dump_entry.second_ip then
+			ip2_addr_str = dylib.ip_format_addr(
+				fib_dump_entry.grantor2_ip)
+			acc = acc .. "\n\tGrantor IP address (2): " ..
+				ip2_addr_str
+		end
 	end
 
 	acc = acc .. "\n\tEthernet cache entry:"
