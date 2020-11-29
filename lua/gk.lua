@@ -23,7 +23,7 @@ return function (net_conf, lls_conf, sol_conf, gk_lcores, gk_sol_map)
 	local max_pkt_burst_front = 32
 	local max_pkt_burst_back = 32
 
-	local flow_ht_size = 4096
+	local flow_ht_size = 32768
 	local flow_table_scan_iter = 0
 	local scan_del_thresh = flow_ht_size * 0.1
 
