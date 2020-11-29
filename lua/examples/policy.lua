@@ -3,7 +3,7 @@ local ffi = require("ffi")
 
 local function dcs_default(policy)
 	return policylib.decision_granted(policy,
-		10,	-- tx_rate_kb_sec
+		16,	-- tx_rate_kb_sec
 		60,	-- cap_expire_sec
 		50000,	-- next_renewal_ms
 		1000)	-- renewal_step_ms
@@ -38,6 +38,7 @@ local simple_policy = {
 		-- Loosely assume that TCP and UDP ports are equivalents
 		-- to simplify this example.
 		[policylib.c.gt_cpu_to_be_16(80)] = dcs_friendly,
+		[policylib.c.gt_cpu_to_be_16(1234)] = dcs_friendly,
 	},
 	[policylib.c.IPV6] = {
 		-- Loosely assume that TCP and UDP ports are equivalents
@@ -241,13 +242,7 @@ end
 
 function lookup_policy(pkt_info, policy)
 
-	local group
-
-	group = lookup_lpm_policy(pkt_info)
-
-	if group == nil then
-		group = lookup_simple_policy(pkt_info)
-	end
+	local group = lookup_simple_policy(pkt_info)
 
 	if group == nil then
 		group = dcs_default

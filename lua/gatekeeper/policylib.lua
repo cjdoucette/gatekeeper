@@ -172,6 +172,15 @@ struct grantedv2_params {
 	bool direct_if_possible;
 } __attribute__ ((packed));
 
+struct pk_params {
+	uint32_t tx1_rate_kib_sec;
+	uint32_t tx2_rate_kib_sec;
+	uint32_t next_renewal_ms;
+	uint32_t renewal_step_ms;
+	bool direct_if_possible;
+	uint16_t ports_be[3];
+} __attribute__ ((packed));
+
 struct in_addr {
 	uint32_t s_addr;
 };
@@ -202,6 +211,7 @@ BPF_INDEX_GRANTED = 0
 BPF_INDEX_DECLINED = 1
 BPF_INDEX_GRANTEDV2 = 2
 BPF_INDEX_WEB = 3
+BPF_INDEX_PK = 4
 
 function decision_granted_nobpf(policy, tx_rate_kib_sec, cap_expire_sec,
 	next_renewal_ms, renewal_step_ms)
@@ -283,6 +293,28 @@ function decision_web(policy, tx_rate_kib_sec, cap_expire_sec,
 	return decision_grantedv2_will_full_params(BPF_INDEX_WEB,
 		policy, tx_rate_kib_sec, tx_rate_kib_sec * 0.05, -- 5%
 		cap_expire_sec, next_renewal_ms, renewal_step_ms, false)
+end
+
+function decision_pk(policy,
+	tx1_rate_kib_sec, tx2_rate_kib_sec, cap_expire_sec,
+	next_renewal_ms, renewal_step_ms, ports)
+	policy.state = c.GK_BPF
+	policy.params.bpf.expire_sec = cap_expire_sec
+	policy.params.bpf.program_index = BPF_INDEX_PK
+	policy.params.bpf.reserved = 0
+	policy.params.bpf.cookie_len = ffi.sizeof("struct pk_params")
+
+	local params = ffi.cast("struct pk_params *",
+		policy.params.bpf.cookie)
+	params.tx1_rate_kib_sec = tx1_rate_kib_sec
+	params.tx2_rate_kib_sec = tx2_rate_kib_sec
+	params.next_renewal_ms = next_renewal_ms
+	params.renewal_step_ms = renewal_step_ms
+	params.ports_be[0] = c.gt_cpu_to_be_16(ports[1])
+	params.ports_be[1] = c.gt_cpu_to_be_16(ports[2])
+	params.ports_be[2] = c.gt_cpu_to_be_16(ports[3])
+
+	return true
 end
 
 -- There is no -> operator in Lua. The . operator works
