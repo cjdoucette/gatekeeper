@@ -2444,7 +2444,7 @@ gk_proc(void *arg)
 				&instance->traffic_stats;
 
 			GK_LOG(NOTICE,
-				"The GK block basic measurements at lcore = %u: [tot_pkts_num = %"PRIu64", tot_pkts_size = %"PRIu64", pkts_num_granted = %"PRIu64", pkts_size_granted = %"PRIu64", pkts_num_request = %"PRIu64", pkts_size_request =  %"PRIu64", pkts_num_declined = %"PRIu64", pkts_size_declined =  %"PRIu64", tot_pkts_num_dropped = %"PRIu64", tot_pkts_size_dropped =  %"PRIu64", tot_pkts_num_distributed = %"PRIu64", tot_pkts_size_distributed =  %"PRIu64"]\n",
+				"The GK block basic measurements at lcore = %u: [tot_pkts_num = %"PRIu64", tot_pkts_size = %"PRIu64", pkts_num_granted = %"PRIu64", pkts_size_granted = %"PRIu64", pkts_num_request = %"PRIu64", pkts_size_request =  %"PRIu64", pkts_num_declined = %"PRIu64", pkts_size_declined =  %"PRIu64", tot_pkts_num_dropped = %"PRIu64", tot_pkts_size_dropped =  %"PRIu64", tot_pkts_num_distributed = %"PRIu64", tot_pkts_size_distributed =  %"PRIu64"], num_flows = %"PRId32"\n",
 				lcore, stats->tot_pkts_num,
 				stats->tot_pkts_size,
 				stats->pkts_num_granted,
@@ -2456,7 +2456,8 @@ gk_proc(void *arg)
 				stats->tot_pkts_num_dropped,
 				stats->tot_pkts_size_dropped,
 				stats->tot_pkts_num_distributed,
-				stats->tot_pkts_size_distributed);
+				stats->tot_pkts_size_distributed,
+				rte_hash_count(instance->ip_flow_hash_table));
 
 			memset(stats, 0, sizeof(*stats));
 
